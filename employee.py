@@ -2,7 +2,7 @@ import pandas as pd
 import random
 import time
 
-######
+
 class Employee:
     def __init__(self, id, paramedic, driver, trainee, dispatcher, chief, RM, JuHe, JuFa):
         self.id = id
@@ -113,6 +113,13 @@ class EmployeeOp:
         if chief.id == "755":
             for i in employees:
                 if driver is None and i.driver == "1" and i.restrictions != []:
+                    driver = i
+                    if EmployeeOp.check_group_restrictions([chief, dispatcher1, dispatcher2, driver]):
+                        return driver
+                    else:
+                        driver = None
+            for i in employees: # need the blocks since there could be drivers with no restrictions
+                if driver is None and i.driver == "1":
                     driver = i
                     if EmployeeOp.check_group_restrictions([chief, dispatcher1, dispatcher2, driver]):
                         return driver
