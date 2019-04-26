@@ -1,6 +1,7 @@
 import pandas as pd
 import random
 import time
+import re
 
 
 class Employee:
@@ -37,7 +38,11 @@ class Employee:
                    self.RM, self.JuHe, self.JuFa, self.restrictions,
                    self.preferences, self.time_preference)
 
+    def __repr__(self):
+        return "Employee({})".format(self.id)
+
     def add_restriction(self, value):
+        """ Some employees does not want to work with some other employees """
         self.restrictions.append(value)
 
     def remove_restriction(self, value):
@@ -47,6 +52,7 @@ class Employee:
             print("The value is not in restrictions list")
 
     def add_preference(self, value):
+        """ Some employees would like to work with some other employees """
         self.preferences.append(value)
 
     def remove_preference(self, value):
@@ -56,50 +62,72 @@ class Employee:
             print("The value is not in preferences list")
 
     def add_time_preference(self, start_time, end_time):
+        """ Some employees can't work full day"""
         self.time_preference.append((start_time, end_time))
 
 
 class EmployeeOp:
+
+    def find_available_employees_list(file_name="available_employees.txt"):
+        """The function is used to read list of available employees from txt file available_employees"""
+        found_ids = []
+        with open(file_name, 'r') as f:
+            file_text = f.read()
+
+        searched_pattern = '<div class="_instance _personInstance _volunteer" data-id=.+?">'
+        found_lines = re.findall(searched_pattern, file_text)
+        for line in found_lines:
+            # line example: <div class="_instance _personInstance _volunteer" data-id="4781" data-name="Bдck Bettina">
+            found_ids.append(line.split()[4].split("=")[1].strip('"'))
+        return found_ids
+
     def create_employee_list(blacklist='blacklist.csv', preferences='wishlist.csv', memberlist='member_test1.csv'):
         restrictions_csv = pd.read_csv(blacklist)
         restrictions = []
         for line in restrictions_csv.values:
+            #line exmple ['14069;5006']
             restrictions.append((list(line)[0].split(';')))
 
         preferences_csv = pd.read_csv(preferences)
         preferences = []
         for line in preferences_csv.values:
+            # line example ['204397;307395;;'] and another example ['898365;;18:00;0:00']
             preferences.append((list(line)[0].split(';')))
-
-        employees_csv = pd.read_csv(memberlist)
+        full_employees_csv = pd.read_csv(memberlist)  # this is full list of employees, not available employees
+        available_employees_ids_list = EmployeeOp.find_available_employees_list()
         employees = []
         employees_trainees = []
         employees_with_retsrictions = []
         employee_with_time_restrictions = []
-        for line in employees_csv.values:
-            employee = Employee(*list(line)[0].split(';'))
-            for restr in restrictions:
-                if restr[0] == employee.id:
-                    employee.add_restriction(restr[1])
-                    employees_with_retsrictions.append(employee)
-                if restr[1] == employee.id:
-                    employee.add_restriction(restr[0])
-                    employees_with_retsrictions.append(employee)
-            for wish in preferences:
-                if wish[0] == employee.id:
-                    if wish[1] != "":
-                        employee.add_preference(wish[1])
-                    if wish[2] != "":
-                        employee.add_time_preference(wish[2], wish[3])
-                        employee_with_time_restrictions.append(employee)
-            if employee not in employee_with_time_restrictions:
-                employees.append(employee)
-            if employee.trainee == "1":
-                employees_trainees.append(employee)
+        for line in full_employees_csv.values:
+            # line example ['366930;1;;;;;;;']
+            if line[0].split(';')[0] in available_employees_ids_list:  # check if employee is available today
+                employee = Employee(*list(line)[0].split(';'))
+                for restr in restrictions:  # add restrictions to work with
+                    # restr example #line ['14069', '5006']
+                    if restr[0] == employee.id:
+                        employee.add_restriction(restr[1])
+                        employees_with_retsrictions.append(employee)
+                    if restr[1] == employee.id:
+                        employee.add_restriction(restr[0])
+                        employees_with_retsrictions.append(employee)
+                for wish in preferences:  # add desire to work with
+                    # wish example ['898365', '333333333333', '18:00' , '0:00']
+                    if wish[0] == employee.id:
+                        if wish[1] != "":
+                            employee.add_preference(wish[1])
+                        if wish[2] != "":
+                            employee.add_time_preference(wish[2], wish[3])
+                            employee_with_time_restrictions.append(employee)
+                if employee not in employee_with_time_restrictions:
+                    # we'll add them in the end of list since we do not want them to be in rtw groups
+                    employees.append(employee)
+                if employee.trainee == "1":
+                    employees_trainees.append(employee)
         random.shuffle(employees, random.random)
         random.shuffle(employees_trainees, random.random)
         random.shuffle(employees_with_retsrictions, random.random)
-        employees = employees + employee_with_time_restrictions
+        employees = employees + employee_with_time_restrictions  # now add time restricted employees to the end of list
         return employees, employees_trainees, list(set(employees_with_retsrictions))
 
     def check_group_restrictions(group):
