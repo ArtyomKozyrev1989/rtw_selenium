@@ -137,24 +137,33 @@ class EmployeeOp:
                     return False
         return True
 
-    def driver_for_chief_group(chief, dispatcher1, dispatcher2, driver):
+    def choose_chief_and_driver(employees):
+        """ Find chief and driver if chief need driver """
+        chief = None
+        driver = None
+        for e in employees:
+            if e.chief == "1":
+                chief = e
+                break
         if chief.id == "755":
-            for i in employees:
-                if driver is None and i.driver == "1" and i.restrictions != []:
-                    driver = i
-                    if EmployeeOp.check_group_restrictions([chief, dispatcher1, dispatcher2, driver]):
-                        return driver
-                    else:
-                        driver = None
-            for i in employees: # need the blocks since there could be drivers with no restrictions
-                if driver is None and i.driver == "1":
-                    driver = i
-                    if EmployeeOp.check_group_restrictions([chief, dispatcher1, dispatcher2, driver]):
-                        return driver
-                    else:
-                        driver = None
-        else:
-            return driver
+            for e in employees:
+                if e.id == '278349':
+                    driver = e
+                    break
+            if not driver:
+                for e in employees:
+                    if e.driver == "1"
+                        driver = e
+                        break
+        return chief, driver
+
+    def choose_dispatcher(employees):
+        """ Find dispatchers"""
+        dispatcher = None
+        for e in employees:
+            if e.dispatcher == "1":
+                dispatcher = e
+                return dispatcher
 
     def remove_employee_from_groups(employees, employees_trainees, employees_with_retsrictions, employee):
         if len(employees) > 0:
@@ -166,45 +175,6 @@ class EmployeeOp:
         if len(employees_with_retsrictions) > 0:
             if employee in employees_with_retsrictions:
                 employees_with_retsrictions.remove(employee)
-
-    def create_chief_group(employees, employees_trainees, employees_with_retsrictions):
-        driver = None
-        chief = None
-        dispatcher1 = None
-        dispatcher2 = None
-        group_not_ready = True
-        while group_not_ready:
-            for i in employees:
-                if chief is None and i.chief == "1":
-                    chief = i
-                    continue
-                elif dispatcher1 is None and i.dispatcher == "1":
-                    dispatcher1 = i
-                    continue
-                elif dispatcher2 is None and i.dispatcher == "1":
-                    dispatcher2 = i
-                    continue
-                elif chief is not None and dispatcher1 is not None and dispatcher2 is not None:
-                    if EmployeeOp.check_group_restrictions([chief, dispatcher1, dispatcher2]):
-                        group_not_ready = False
-                        break
-                    else:
-                        chief = None
-                        dispatcher1 = None
-                        dispatcher2 = None
-                else:
-                    continue
-        EmployeeOp.remove_employee_from_groups(employees, employees_trainees, employees_with_retsrictions, chief)
-        EmployeeOp.remove_employee_from_groups(employees, employees_trainees, employees_with_retsrictions, dispatcher1)
-        EmployeeOp.remove_employee_from_groups(employees, employees_trainees, employees_with_retsrictions, dispatcher2)
-        # chief = Employee("755", "1", "", "", "", "1", "", "", "")
-        # need to check what when 755 is chief
-        driver = EmployeeOp.driver_for_chief_group(chief, dispatcher1, dispatcher2, driver)
-        if driver:
-            EmployeeOp.remove_employee_from_groups(employees, employees_trainees, employees_with_retsrictions, driver)
-            return [chief, dispatcher1, dispatcher2, driver]
-        else:
-            return [chief, dispatcher1, dispatcher2]
 
     def create_rtw_group(employees, employees_trainees, employees_with_retsrictions):
         driver = None
