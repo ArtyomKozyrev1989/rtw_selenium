@@ -1,7 +1,8 @@
 import pandas as pd
 import random
-import time
+import copy
 import re
+import time
 
 
 class Employee:
@@ -18,6 +19,17 @@ class Employee:
         self.restrictions = []
         self.preferences = []
         self.time_preference = []
+        self.type = self.define_employee_type()
+
+    def define_employee_type(self):
+        if self.driver == "1":
+            return "driver"
+        elif self.driver != "1" and self.paramedic == "1":
+            return "pnd"
+        elif self.trainee == "1":
+            return "trainee"
+        else:
+            return "other"
 
     def __str__(self):
         return '''
@@ -81,6 +93,112 @@ class EmployeeOp:
             found_ids.append(line.split()[4].split("=")[1].strip('"'))
         return found_ids
 
+    def find_if_restricted(team, employee):
+        """ check if employee can work with other team member based on personal blacklist restrictions"""
+        for i in team:
+            if (employee.id in i.restrictions) or (i.id in employee.restrictions):
+                return True
+        return False
+
+    def check_normal_group(group, employees):
+        """check if group has normal number of drivers, pnd, trainee"""
+        driver = 0
+        pnd = 0
+        trainee = 0
+        tempgroup = copy.copy(group)
+        for e in group:
+            if e.driver == "1":
+                driver += 1
+                if driver > 1:
+                    tempgroup.remove(e)
+                    driver -= 1
+                    continue
+            elif e.driver != "1" and e.trainee != "1":
+                pnd += 1
+                if pnd > 1:
+                    tempgroup.remove(e)
+                    pnd -= 1
+                    continue
+            elif e.trainee == "1": # if no trainees left as a result of the operation another pnd will be added to group
+                trainee += 1
+                if trainee > 1:
+                    tempgroup.remove(e)
+                    trainee -= 1
+                    continue
+            else:
+                pass
+        group = tempgroup # I know that it is shallow copy
+        if driver == 0:
+            group.append(EmployeeOp.find_new_driver(group, employees))
+        if pnd == 0:
+            group.append(EmployeeOp.find_new_pnd(group, employees))
+        if trainee == 0:
+            group.append(EmployeeOp.find_new_trainee(group, employees))
+        return group
+
+    def create_dream_group(employees, employees_trainees_ids, employee_trainees, employee_with_pr):
+        second_member_id = employee_with_pr.preferences[0]
+        second_member = None
+        third_member_id = None
+        third_member = None
+        for i in employees:
+            if i.id == second_member_id:
+                second_member = i # was discussed to ignore situation when if A in B blacklist
+                break
+        else:
+            if employee_with_pr.type == "driver":
+                second_member = EmployeeOp.find_new_pnd([employee_with_pr], employees)
+            if employee_with_pr.type == "pnd":
+                second_member = EmployeeOp.find_new_driver([employee_with_pr], employees)
+            if employee_with_pr.type == "trainee":
+                second_member = EmployeeOp.find_new_driver([employee_with_pr], employees)
+        if employees_trainees_ids and employee_with_pr.id not in employees_trainees_ids and second_member.id not in employees_trainees_ids:
+            if second_member.preferences:
+                if second_member.preferences[0] in employees_trainees_ids:
+                    third_member_id = second_member.preferences[0]
+                    for i in employees:
+                        if i.id == third_member_id and not EmployeeOp.find_if_restricted(
+                                [second_member, employee_with_pr], i):
+                            third_member = i
+                            break
+                else:
+                    third_member = EmployeeOp.find_new_trainee([second_member, employee_with_pr], employees)
+            else:
+                third_member = EmployeeOp.find_new_trainee([second_member, employee_with_pr], employees)
+        else:
+            if employee_with_pr.driver != 1 and second_member.driver != 1:
+                third_member = EmployeeOp.find_new_pnd([second_member, employee_with_pr], employees)
+            else:
+                third_member = EmployeeOp.find_new_driver([second_member, employee_with_pr], employees)
+
+        result = EmployeeOp.check_normal_group([employee_with_pr, second_member, third_member], employees)
+        for emp in result:
+            print(len(result))
+            EmployeeOp.remove_employee_from_groups(employees, employee_trainees, employees_trainees_ids, emp)
+        return result
+
+
+    def find_new_driver(group, employees):
+        for i in employees:
+            if i.type == "driver" and not EmployeeOp.find_if_restricted(group, i):
+                return i
+        else:
+            return None
+
+    def find_new_pnd(group, employees):
+        for i in employees:
+            if i.type == "pnd" and not EmployeeOp.find_if_restricted(group, i):
+                return i
+        else:
+            return None
+
+    def find_new_trainee(group, employees):
+        for i in employees:
+            if i.type == "trainee" and not EmployeeOp.find_if_restricted(group, i):
+                return i
+        else:
+            EmployeeOp.find_new_pnd(group, employees) # if was not able to find trainee for group
+
     def create_employee_list(blacklist='blacklist.csv', preferences='wishlist.csv', memberlist='member_test1.csv'):
         restrictions_csv = pd.read_csv(blacklist)
         restrictions = []
@@ -94,9 +212,10 @@ class EmployeeOp:
             # line example ['204397;307395;;'] and another example ['898365;;18:00;0:00']
             preferences.append((list(line)[0].split(';')))
         full_employees_csv = pd.read_csv(memberlist)  # this is full list of employees, not available employees
-        available_employees_ids_list = EmployeeOp.find_available_employees_list()
+        available_employees_ids_list = EmployeeOp.find_available_employees_list() # for the day
         employees = []
         employees_trainees = []
+        employees_trainees_ids = []
         employees_with_retsrictions = []
         employees_with_preferences = []
         employees_with_time_restrictions = []
@@ -125,6 +244,7 @@ class EmployeeOp:
                     # we'll add them in the end of list since we do not want them to be in rtw groups
                     employees.append(employee)
                 if employee.trainee == "1":
+                    employees_trainees_ids.append(employee.id)
                     employees_trainees.append(employee)
         random.shuffle(employees, random.random)
         random.shuffle(employees_trainees, random.random)
@@ -134,8 +254,7 @@ class EmployeeOp:
             if i in employees_with_time_restrictions:
                 employees_with_preferences.remove(i)
         return employees, employees_trainees, employees_with_preferences,\
-               list(set(employees_with_retsrictions)), employees_with_time_restrictions
-
+               list(set(employees_with_retsrictions)),  employees_trainees_ids
 
     def choose_chief_and_driver(employees):
         """ Find chief and driver if chief need driver """
@@ -166,90 +285,19 @@ class EmployeeOp:
                 return dispatcher
 
 
-    def remove_employee_from_groups(employees, employees_trainees, employees_with_retsrictions, employees_with_preferences, employee):
+    def remove_employee_from_groups(employees, employees_trainees, employees_trainees_ids, employee):
         if len(employees) > 0:
-            if employee in employees:
-                employees.remove(employee)
+            #if employee in employees:
+            print(employee)
+            time.sleep(3)
+            employees.remove(employee)
         if len(employees_trainees) > 0:
             if employee in employees_trainees:
                 employees_trainees.remove(employee)
-        if len(employees_with_retsrictions) > 0:
-            if employee in employees_with_retsrictions:
-                employees_with_retsrictions.remove(employee)
-        if len(employees_with_preferences) > 0:
-            if employee in employees_with_preferences:
-                employees_with_preferences.remove(employee)
+        if len(employees_trainees_ids) > 0:
+            if employee.id in employees_trainees_ids:
+                employees_trainees_ids.remove(employee.id)
 
-
-    def create_dream_rtw_for_trainee(employees, employees_trainees,
-                                     employees_with_retsrictions, employees_with_preferences):
-        driver = None
-        pnd = None  # paramedic_not_driver
-        trainee_or_pnd = None
-        for i in employees_with_preferences:
-            if i.trainee == "1":
-                trainee_or_pnd = i
-                break
-        for i in employees:
-            if i.id == trainee_or_pnd.preferences[0]:
-                second = i
-                break
-
-        if second.preferences != [] and second.preferences[0] != trainee_or_pnd.id:
-            if second.preferences[0] not in trainee_or_pnd.restrictions:
-                for i in employees:
-                    if i.id == second.preferences[0]:
-                        third = i
-                        break
-                if trainee_or_pnd.id not in third.restrictions:
-                    if second.driver == "1":
-                         driver = second
-                         pnd = third
-                    else:
-                        driver = third
-                        pnd = second
-                else:
-                    if second.driver == "1":
-                        driver = second
-                        for i in employees:
-                            if i.id != trainee_or_pnd.id and i.id != driver.id:
-                                if i.paramedic == "1" and i.driver != "1":
-                                    pnd = i
-                                    break
-                    else:
-                        pnd == second
-                        if i.id != trainee_or_pnd.id and i.id != pnd.id:
-                            for i in employees:
-                                if i.id != trainee_or_pnd.id and driver.id:
-                                    if i.driver == "1":
-                                        driver = i
-                                        break
-        else:
-            if second.driver == "1":
-                driver = second
-                for i in employees:
-                    if i.id != trainee_or_pnd.id and i.id != driver.id:
-                        if i.paramedic == "1" and i.driver != "1":
-                            if i.id not in driver.restrictions and i.id not in trainee_or_pnd.restrictions:
-                                if driver.id not in i.restrictions and trainee_or_pnd not in i.restrictions:
-                                    pnd = i
-                                    break
-            else:
-                pnd = second
-                for i in employees:
-                    if i.id != trainee_or_pnd.id and i.id != pnd.id:
-                        if i.driver == "1":
-                            if i.id not in pnd.restrictions and i.id not in trainee_or_pnd.restrictions:
-                                if pnd.id not in i.restrictions and trainee_or_pnd not in i.restrictions:
-                                    driver = i
-                                    break
-        EmployeeOp.remove_employee_from_groups(employees, employees_trainees, employees_with_retsrictions,
-                                               employees_with_preferences, driver)
-        EmployeeOp.remove_employee_from_groups(employees, employees_trainees, employees_with_retsrictions,
-                                               employees_with_preferences, pnd)
-        EmployeeOp.remove_employee_from_groups(employees, employees_trainees, employees_with_retsrictions,
-                                               employees_with_preferences, trainee_or_pnd)
-        return [driver, pnd, trainee_or_pnd]
 
 
     def check_group_restrictions(group):
@@ -307,13 +355,32 @@ class EmployeeOp:
 
 
 if __name__ == '__main__':
+    (employees, employees_trainees, employees_with_preferences,
+     employees_with_retsrictions, employees_trainees_ids) = EmployeeOp.create_employee_list()
 
+    dream_groups = []
+    for i in employees_with_preferences:
+        if i in employees: # !!!!
+            group = EmployeeOp.create_dream_group(employees, employees_trainees_ids, employees_trainees, i)
+            dream_groups.append(group)
+            print(len(employees))
+
+    gr_n = 1
+    for gr in dream_groups:
+        print("Dream group # {}".format(gr_n))
+        for i in gr:
+            print(i)
+        gr_n += 1
+
+
+'''
     employees, employees_trainees, employees_with_preferences,\
     employees_with_retsrictions, employees_with_time_restrictions = EmployeeOp.create_employee_list()
 
     for i in employees_with_preferences:
         print(i)
-    '''
+'''
+'''
     for i in employees:
         if i.preferences != []:
             print(str(i))
