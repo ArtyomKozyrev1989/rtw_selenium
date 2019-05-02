@@ -2,7 +2,6 @@ import pandas as pd
 import random
 import copy
 import re
-import time
 
 
 class Employee:
@@ -173,7 +172,6 @@ class EmployeeOp:
 
         result = EmployeeOp.check_normal_group([employee_with_pr, second_member, third_member], employees)
         for emp in result:
-            print(len(result))
             EmployeeOp.remove_employee_from_groups(employees, employee_trainees, employees_trainees_ids, emp)
         return result
 
@@ -256,7 +254,7 @@ class EmployeeOp:
         return employees, employees_trainees, employees_with_preferences,\
                list(set(employees_with_retsrictions)),  employees_trainees_ids
 
-    def choose_chief_and_driver(employees):
+    def choose_chief_and_driver(employees, employees_trainees, employees_trainees_ids):
         """ Find chief and driver if chief need driver """
         chief = None
         driver = None
@@ -274,23 +272,27 @@ class EmployeeOp:
                     if e.driver == "1" and e not in chief.restrictions and chief not in e.restrictions:
                         driver = e
                         break
-        return chief, driver
+        EmployeeOp.remove_employee_from_groups(employees, employees_trainees, employees_trainees_ids, chief)
+        if driver:
+            EmployeeOp.remove_employee_from_groups(employees, employees_trainees, employees_trainees_ids, driver)
+        return [chief, driver]
 
-    def choose_dispatcher(employees):
+    def choose_dispatcher(employees, employees_trainees, employees_trainees_ids):
         """ Find dispatchers"""
         dispatcher = None
         for e in employees:
             if e.dispatcher == "1":
                 dispatcher = e
+                EmployeeOp.remove_employee_from_groups(employees, employees_trainees,
+                                                       employees_trainees_ids, dispatcher)
                 return dispatcher
 
-
     def remove_employee_from_groups(employees, employees_trainees, employees_trainees_ids, employee):
-        if len(employees) > 0:
-            #if employee in employees:
-            print(employee)
-            time.sleep(3)
-            employees.remove(employee)
+        if len(employees) > 0 and employee:
+            try:
+                employees.remove(employee)
+            except Exception as ex:
+                print(ex)
         if len(employees_trainees) > 0:
             if employee in employees_trainees:
                 employees_trainees.remove(employee)
@@ -307,12 +309,16 @@ class EmployeeOp:
                     return False
         return True
 
-    def create_rtw_group(employees, employees_trainees, employees_with_retsrictions):
+    def create_rtw_group(employees, employees_trainees, employees_trainees_ids):
+        if len(employees) < 3:
+            print("Can't create RTW, employees number < 3")
+            return employees
         driver = None
         pnd = None  # paramedic_not_driver
         trainee_or_pnd = None
         group_not_ready = True
         attempts_count_restrictions = 0
+        full_stop = 1
         while group_not_ready:
             for i in employees:
                 if driver is None and i.driver == "1":
@@ -336,6 +342,8 @@ class EmployeeOp:
                     elif attempts_count_restrictions == 10:
                         group_not_ready = False
                         attempts_count_restrictions = 0
+                        print("WAS NOT ABLE TO CREATE GROUP ACCORDING TO RULES!!!")
+                        print([driver, pnd, trainee_or_pnd])
                         break
                     else:
                         driver = None
@@ -345,12 +353,21 @@ class EmployeeOp:
                 else:
                     continue
             if group_not_ready:
+                driver = None
+                pnd = None
+                trainee_or_pnd = None
                 random.shuffle(employees, random.random)
                 random.shuffle(employees_trainees, random.random)
+                full_stop += 1
+                if full_stop == 5:
+                    break
 
-        EmployeeOp.remove_employee_from_groups(employees, employees_trainees, employees_with_retsrictions, driver)
-        EmployeeOp.remove_employee_from_groups(employees, employees_trainees, employees_with_retsrictions, pnd)
-        EmployeeOp.remove_employee_from_groups(employees, employees_trainees, employees_with_retsrictions, trainee_or_pnd)
+        if driver == pnd or driver == trainee_or_pnd or trainee_or_pnd == pnd:
+            print("ABNORMAL SITUATION ATTENTION!!!")
+
+        EmployeeOp.remove_employee_from_groups(employees, employees_trainees, employees_trainees_ids, driver)
+        EmployeeOp.remove_employee_from_groups(employees, employees_trainees, employees_trainees_ids, pnd)
+        EmployeeOp.remove_employee_from_groups(employees, employees_trainees, employees_trainees_ids, trainee_or_pnd)
         return [driver, pnd, trainee_or_pnd]
 
 
@@ -358,12 +375,27 @@ if __name__ == '__main__':
     (employees, employees_trainees, employees_with_preferences,
      employees_with_retsrictions, employees_trainees_ids) = EmployeeOp.create_employee_list()
 
+    print("Available employees {} ".format(len(employees)))
+    #create chief group:
+    chief_gr = EmployeeOp.choose_chief_and_driver(employees, employees_trainees, employees_trainees_ids)
+    print("Chief group {}".format(chief_gr))
+    for i in chief_gr:
+        if i:
+            print(i)
+    print("Available employees {} ".format(len(employees)))
+
+    dispatcher1 = EmployeeOp.choose_dispatcher(employees, employees_trainees, employees_trainees_ids)
+    dispatcher2 = EmployeeOp.choose_dispatcher(employees, employees_trainees, employees_trainees_ids)
+
+    print("Dispacther1 {}".format(dispatcher1))
+    print("Dispacther2 {}".format(dispatcher2))
+    print("Available employees {} ".format(len(employees)))
+
     dream_groups = []
     for i in employees_with_preferences:
-        if i in employees: # !!!!
+        if i in employees: # it could be removed in one of previous steps
             group = EmployeeOp.create_dream_group(employees, employees_trainees_ids, employees_trainees, i)
             dream_groups.append(group)
-            print(len(employees))
 
     gr_n = 1
     for gr in dream_groups:
@@ -372,39 +404,17 @@ if __name__ == '__main__':
             print(i)
         gr_n += 1
 
+    print("Available employees {} ".format(len(employees)))
 
-'''
-    employees, employees_trainees, employees_with_preferences,\
-    employees_with_retsrictions, employees_with_time_restrictions = EmployeeOp.create_employee_list()
-
-    for i in employees_with_preferences:
-        print(i)
-'''
-'''
-    for i in employees:
-        if i.preferences != []:
-            print(str(i))
-    print("Total employees: {}".format(len(employees)))
-    print("Total trainees: {}".format(len(employees_trainees)))
-    print("Total employee with restrictions: {}".format(len(employees_with_retsrictions)))
-    with open("tests.txt", 'a') as f:
-        f.write("Cycle ****************************************************************************")
-
-    for gr in range(0, 18):
-        print("Group {}: \n".format(gr))
-        with open("tests.txt",  'a') as f:
-            f.write("Group {} *********************************************************: \n".format(gr))
-        for i in EmployeeOp.create_rtw_group(employees, employees_trainees, employees_with_retsrictions):
+    # create normal groups:
+    for i in range(1, 30 - gr_n):
+        print("ORDINARY GROUP # {}".format(i))
+        ord_gr = EmployeeOp.create_rtw_group(employees, employees_trainees, employees_trainees_ids)
+        print(ord_gr)
+        for i in ord_gr:
             print(i)
-            with open("tests.txt", 'a') as f:
-                f.write(str(i))
+        print("Available employees {} ".format(len(employees)))
 
-    print("Total employees: {}".format(len(employees)))
-    print("Total trainees: {}".format(len(employees_trainees)))
-    print("Total employee with restrictions: {}".format(len(employees_with_retsrictions)))
-    print("The calculations finished. The console will be closed in 60 seconds")
-    time.sleep(5)
-
+    print("ALL who left")
     for i in employees:
         print(str(i))
-    '''
