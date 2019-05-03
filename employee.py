@@ -2,7 +2,16 @@ import pandas as pd
 import random
 import copy
 import re
+import time
+import logging
 
+logt = time.localtime()
+
+logging.basicConfig(
+    filename='logging_rtw_gr_{}{}{}.log'.format(logt.tm_year,
+                                                str(logt.tm_mon).rjust(2, "0"),
+                                                str(logt.tm_mday).rjust(2, "0")),
+    level=logging.WARNING, format='%(asctime)s %(message)s')
 
 class Employee:
     def __init__(self, id, paramedic, driver, trainee, dispatcher, chief, RM, JuHe, JuFa):
@@ -342,8 +351,8 @@ class EmployeeOp:
                     elif attempts_count_restrictions == 10:
                         group_not_ready = False
                         attempts_count_restrictions = 0
-                        print("WAS NOT ABLE TO CREATE GROUP ACCORDING TO RULES!!!")
-                        print([driver, pnd, trainee_or_pnd])
+                        logging.warning("WAS NOT ABLE TO CREATE GROUP ACCORDING TO RULES!!!")
+                        logging.warning("{}".format([driver, pnd, trainee_or_pnd]))
                         break
                     else:
                         driver = None
@@ -363,7 +372,8 @@ class EmployeeOp:
                     break
 
         if driver == pnd or driver == trainee_or_pnd or trainee_or_pnd == pnd:
-            print("ABNORMAL SITUATION ATTENTION!!!")
+            logging.warning("ABNORMAL SITUATION ATTENTION!!!")
+            logging.warning("{}".format([driver, pnd, trainee_or_pnd]))
 
         EmployeeOp.remove_employee_from_groups(employees, employees_trainees, employees_trainees_ids, driver)
         EmployeeOp.remove_employee_from_groups(employees, employees_trainees, employees_trainees_ids, pnd)
@@ -375,46 +385,67 @@ if __name__ == '__main__':
     (employees, employees_trainees, employees_with_preferences,
      employees_with_retsrictions, employees_trainees_ids) = EmployeeOp.create_employee_list()
 
-    print("Available employees {} ".format(len(employees)))
-    #create chief group:
-    chief_gr = EmployeeOp.choose_chief_and_driver(employees, employees_trainees, employees_trainees_ids)
-    print("Chief group {}".format(chief_gr))
-    for i in chief_gr:
-        if i:
-            print(i)
-    print("Available employees {} ".format(len(employees)))
+    with open("result_{}{}{}.txt".format(
+            logt.tm_year, str(logt.tm_mon).rjust(2, "0"), str(logt.tm_mday).rjust(2, "0")), 'a') as f:
 
-    dispatcher1 = EmployeeOp.choose_dispatcher(employees, employees_trainees, employees_trainees_ids)
-    dispatcher2 = EmployeeOp.choose_dispatcher(employees, employees_trainees, employees_trainees_ids)
-
-    print("Dispacther1 {}".format(dispatcher1))
-    print("Dispacther2 {}".format(dispatcher2))
-    print("Available employees {} ".format(len(employees)))
-
-    dream_groups = []
-    for i in employees_with_preferences:
-        if i in employees: # it could be removed in one of previous steps
-            group = EmployeeOp.create_dream_group(employees, employees_trainees_ids, employees_trainees, i)
-            dream_groups.append(group)
-
-    gr_n = 1
-    for gr in dream_groups:
-        print("Dream group # {}".format(gr_n))
-        for i in gr:
-            print(i)
-        gr_n += 1
-
-    print("Available employees {} ".format(len(employees)))
-
-    # create normal groups:
-    for i in range(1, 30 - gr_n):
-        print("ORDINARY GROUP # {}".format(i))
-        ord_gr = EmployeeOp.create_rtw_group(employees, employees_trainees, employees_trainees_ids)
-        print(ord_gr)
-        for i in ord_gr:
-            print(i)
         print("Available employees {} ".format(len(employees)))
+        f.write("Available employees {} ".format(len(employees)) + "\n")
+        # create chief group:
+        chief_gr = EmployeeOp.choose_chief_and_driver(employees, employees_trainees, employees_trainees_ids)
+        print("Chief group {}".format(chief_gr))
+        f.write("Chief group {}".format(chief_gr) + "\n")
+        for i in chief_gr:
+            if i:
+                print(i)
+                f.write(str(i) + "\n")
+        print("Available employees {} ".format(len(employees)))
+        f.write("Available employees {} ".format(len(employees)) + "\n")
 
-    print("ALL who left")
-    for i in employees:
-        print(str(i))
+        dispatcher1 = EmployeeOp.choose_dispatcher(employees, employees_trainees, employees_trainees_ids)
+        dispatcher2 = EmployeeOp.choose_dispatcher(employees, employees_trainees, employees_trainees_ids)
+
+        print("Dispacther1 {}".format(dispatcher1))
+        f.write("Dispacther1 {}".format(dispatcher1) + "\n")
+        print("Dispacther2 {}".format(dispatcher2))
+        f.write("Dispacther2 {}".format(dispatcher2) + "\n")
+        print("Available employees {} ".format(len(employees)))
+        f.write("Available employees {} ".format(len(employees)) + "\n")
+
+        dream_groups = []
+        for i in employees_with_preferences:
+            if i in employees:  # it could be removed in one of previous steps
+                group = EmployeeOp.create_dream_group(employees, employees_trainees_ids, employees_trainees, i)
+                dream_groups.append(group)
+
+        gr_n = 1
+        for gr in dream_groups:
+            print("Dream group # {}".format(gr_n))
+            f.write("Dream group # {}".format(gr_n) + "\n")
+            for i in gr:
+                print(i)
+                f.write(str(i) + "\n")
+            gr_n += 1
+
+        print("Available employees {} ".format(len(employees)))
+        f.write("Available employees {} ".format(len(employees)) + "\n")
+
+        # create normal groups:
+        for i in range(1, 30 - gr_n):
+            print("ORDINARY GROUP # {}".format(i))
+            f.write("ORDINARY GROUP # {}".format(i) + "\n")
+            ord_gr = EmployeeOp.create_rtw_group(employees, employees_trainees, employees_trainees_ids)
+            print(ord_gr)
+            f.write(str(ord_gr) + "\n")
+            for i in ord_gr:
+                print(i)
+                f.write(str(i) + "\n")
+            print("Available employees {} ".format(len(employees)))
+            f.write("Available employees {} ".format(len(employees)))
+
+        print("ALL who left")
+        f.write("ALL who left" + "\n")
+        for i in employees:
+            f.write(str(i) + "\n")
+            print(str(i))
+    print("work is done!")
+    time.sleep(20)
