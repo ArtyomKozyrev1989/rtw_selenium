@@ -430,7 +430,14 @@ if __name__ == '__main__':
         f.write("Available employees {} ".format(len(employees)) + "\n")
 
         # create normal groups:
-        for i in range(1, 30 - gr_n):
+        while True:
+            try:
+                total_rtw = int(input("How much rtw do you want to create? "))
+            except Exception as ex:
+                print("It should be integer number")
+            else:
+                break
+        for i in range(1, total_rtw + 2 - gr_n):
             print("ORDINARY GROUP # {}".format(i))
             f.write("ORDINARY GROUP # {}".format(i) + "\n")
             ord_gr = EmployeeOp.create_rtw_group(employees, employees_trainees, employees_trainees_ids)
@@ -448,4 +455,5 @@ if __name__ == '__main__':
             f.write(str(i) + "\n")
             print(str(i))
     print("work is done!")
-    time.sleep(20)
+    time.sleep(5)
+
